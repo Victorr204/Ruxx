@@ -13,29 +13,29 @@ export default function TransactionHistory() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchUserTransactions = async () => {
+    try {
+      const user = await account.get();
+
+      const { documents } = await databases.listDocuments(
+        Config.databaseId,
+        Config.txnCollectionId,
+        [
+          Query.equal('userId', user.$id),
+          Query.orderDesc('$createdAt'),
+        ]
+      );
+
+      setTransactions(documents);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadTransactions = async () => {
-      try {
-        const user = await account.get();
-
-        const res = await databases.listDocuments(
-          Config.databaseId,
-          Config.txnCollectionId,
-          [
-            Query.equal('userId', user.$id),
-            Query.orderDesc('$createdAt'),
-          ]
-        );
-
-        setTransactions(res.documents);
-      } catch (err) {
-        console.error('Error loading transactions', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadTransactions();
+    fetchUserTransactions();
   }, []);
 
   if (loading)
@@ -90,26 +90,39 @@ export default function TransactionHistory() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20 },
+  container: {
+    padding: 20,
+  },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#000', // black title text
   },
   item: {
     marginBottom: 16,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: '#f5f5f5', // light neutral background
     padding: 14,
     borderRadius: 10,
   },
-  label: { fontWeight: '600', color: '#14532d' },
-  value: { fontWeight: 'normal', color: '#064e3b' },
-  timestamp: { marginTop: 6, fontSize: 12, color: '#4b5563' },
+  label: {
+    fontWeight: '600',
+    color: '#000', // black label text
+  },
+  value: {
+    fontWeight: 'normal',
+    color: '#333', // dark gray value text
+  },
+  timestamp: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#555', // medium gray timestamp
+  },
   empty: {
     textAlign: 'center',
     marginTop: 40,
     fontSize: 16,
-    color: '#6b7280',
+    color: '#666', // soft gray for empty state
   },
 });

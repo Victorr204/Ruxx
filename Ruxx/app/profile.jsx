@@ -9,18 +9,21 @@ import {
   ActivityIndicator,
   Modal,
   Image,
+  Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { account, databases, ID, Query, Config } from '../appwriteConfig';
+import { account, databases, Query, Config } from '../appwriteConfig';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+// AsyncStorage not used here directly
+import { useTheme } from '../context/ThemeContext';
+
 
 
 // Cloudinary Info
 const CLOUD_NAME = 'dx4o32jaz';
 const UPLOAD_PRESET = 'vkdfrhb6';
 
-// Reusable alert modal
 function CustomAlert({ visible, onClose, type, title, message }) {
   const icons = {
     success: '✅',
@@ -50,8 +53,10 @@ function CustomAlert({ visible, onClose, type, title, message }) {
   );
 }
 
-
 export default function Profile() {
+  const { theme} = useTheme();
+  
+
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState({});
   const [editingSection, setEditingSection] = useState(null);
@@ -87,17 +92,17 @@ export default function Profile() {
         age: data.age || '',
         phone: data.phone || '',
       });
-    } catch (error) {
-      console.log(error);
+    } catch (_err) {
+      console.log(_err);
       showAlert({
         type: 'error',
         title: 'Error',
-        message: error.message || 'Failed to load user data.',
+        message: _err.message || 'Failed to load user data.',
       });
     } finally {
       setLoading(false);
     }
-  };
+  }; 
 
   const updateSection = async () => {
     try {
@@ -112,14 +117,14 @@ export default function Profile() {
       await databases.updateDocument(Config.databaseId, Config.userCollectionId, docId, {
         name: form.name,
         age: parseFloat(form.age),
-        phone: parseFloat(form.phone),
+        phone: form.phone.trim(),
       });
 
       showAlert({ type: 'success', title: 'Updated', message: 'Data updated successfully' });
       setEditingSection(null);
       loadUserData();
-    } catch (error) {
-      console.log(error);
+    } catch (_error) {
+      console.log(_error);
       showAlert({ type: 'error', title: 'Error', message: 'Update failed. Try again.' });
     }
   };
@@ -168,7 +173,6 @@ export default function Profile() {
           ]);
 
           if (res.documents.length === 0) return;
-
           const docId = res.documents[0].$id;
 
           await databases.updateDocument(Config.databaseId, Config.userCollectionId, docId, {
@@ -195,6 +199,40 @@ export default function Profile() {
     }
   };
 
+  
+
+ const handleRemovePin = async () => {
+  Alert.alert("Confirm", "Are you sure you want to remove your PIN & biometrics?", [
+    { text: "Cancel", style: "cancel" },
+    {
+      text: "Remove",
+      style: "destructive",
+      onPress: async () => {
+        try {
+          await databases.updateDocument(
+            Config.databaseId,
+            Config.userCollectionId,
+            userData.$id,
+            { pin: null, useBiometric: false } // ✅ clear biometric too
+          );
+          showAlert({
+            type: "success",
+            title: "PIN Removed",
+            message: "Your PIN and biometric login have been removed.",
+          });
+          loadUserData();
+        } catch (_err) {
+          showAlert({ type: "error", title: "Error", message: "Failed to remove PIN." });
+        }
+      },
+    },
+  ]);
+};
+
+
+  // loadUserData is stable; run once on mount
+   
+   
   useEffect(() => {
     loadUserData();
   }, []);
@@ -207,99 +245,149 @@ export default function Profile() {
     );
   }
 
-  const handleLogout = async () => {
-  try {
-    await account.deleteSession('current');
-    router.replace('/login'); // Redirect to login screen
-  } catch (err) {
-    showAlert({
-      type: 'error',
-      title: 'Logout Failed',
-      message: err.message || 'Could not log out. Try again.',
-    });
-  }
-};
-
-
-return (
-  <SafeAreaView style={styles.page}>
-    <ScrollView contentContainerStyle={styles.scrollContent}>
-      <View style={styles.imageSection}>
-        <TouchableOpacity onPress={pickAndUploadImage}>
-          <Image
-            source={{
-              uri: userData.profilePic || 'https://placehold.co/120x120?text=Profile',
-            }}
-            style={styles.profileImage}
-          />
-          <Text style={styles.imageText}>Tap to change profile picture</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>User Information</Text>
-        {editingSection === 'user' ? (
-          <>
-            <TextInput
-              placeholder="Name"
-              value={form.name}
-              onChangeText={(text) => setForm({ ...form, name: text })}
-              style={styles.input}
+   return (
+    <SafeAreaView style={[styles.page, { backgroundColor: theme.pageBg }]}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.imageSection}>
+          <TouchableOpacity onPress={pickAndUploadImage}>
+            <Image
+              source={{ uri: userData.profilePic || 'https://placehold.co/120x120?text=Profile' }}
+              style={[styles.profileImage, { borderColor: theme.buttonBg }]}
             />
-            <TextInput
-              placeholder="Age"
-              keyboardType="numeric"
-              value={form.age}
-              onChangeText={(text) => setForm({ ...form, age: text })}
-              style={styles.input}
-            />
-            <TextInput
-              placeholder="Phone"
-              keyboardType="phone-pad"
-              value={form.phone}
-              onChangeText={(text) => setForm({ ...form, phone: text })}
-              style={styles.input}
-            />
-            <TouchableOpacity style={styles.saveBtn} onPress={updateSection}>
-              <Text style={styles.saveText}>Save Info</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <Text>Name: {userData.name}</Text>
-            <Text>Age: {userData.age}</Text>
-            <Text>Phone: {userData.phone}</Text>
-            <Text>Email: {userData.email}</Text>
-            <TouchableOpacity style={styles.updateBtn} onPress={() => setEditingSection('user')}>
-              <Text style={styles.updateText}>View & Update</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </ScrollView>
+            <Text style={[styles.imageText, { color: theme.text }]}>
+              Tap to change profile picture
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-    <View style={styles.logoutWrapper}>
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Logout</Text>
+        <View style={[styles.section, { backgroundColor: theme.sectionBg }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>User Information</Text>
+          {editingSection === 'user' ? (
+            <>
+              <TextInput
+                placeholder="Name"
+                placeholderTextColor={theme.label}
+                value={form.name}
+                onChangeText={(text) => setForm({ ...form, name: text })}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
+              />
+              <TextInput
+                placeholder="Age"
+                placeholderTextColor={theme.label}
+                keyboardType="numeric"
+                value={form.age}
+                onChangeText={(text) => setForm({ ...form, age: text })}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
+              />
+              <TextInput
+                placeholder="Phone"
+                placeholderTextColor={theme.label}
+                keyboardType="phone-pad"
+                value={form.phone}
+                onChangeText={(text) => setForm({ ...form, phone: text })}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.inputBorder,
+                    color: theme.text,
+                  },
+                ]}
+              />
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: theme.buttonBg }]}
+                onPress={updateSection}
+              >
+                <Text style={[styles.saveText, { color: theme.text }]}>Save Info</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={{ color: theme.text }}>Name: {userData.name}</Text>
+              <Text style={{ color: theme.text }}>Age: {userData.age}</Text>
+              <Text style={{ color: theme.text }}>Phone: {userData.phone}</Text>
+              <Text style={{ color: theme.text }}>Email: {userData.email}</Text>
+              <TouchableOpacity
+                style={[styles.updateBtn, { borderColor: theme.buttonBg }]}
+                onPress={() => setEditingSection('user')}
+              >
+                <Text style={[styles.updateText, { color: theme.buttonBg }]}>
+                  View & Update
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        <View style={[styles.section, { backgroundColor: theme.sectionBg }]}>
+  <Text style={[styles.sectionTitle, { color: theme.text }]}>PIN Settings</Text>
+  
+  {userData.pin ? (
+    <>
+      <TouchableOpacity
+        style={[styles.updateBtn, { borderColor: theme.buttonBg }]}
+        onPress={() => router.push("/set-pin")}
+      >
+        <Text style={[styles.updateText, { color: theme.buttonBg }]}>
+          Change PIN
+        </Text>
       </TouchableOpacity>
-    </View>
 
-    <CustomAlert
-      visible={alertVisible}
-      onClose={() => setAlertVisible(false)}
-      type={alertProps.type}
-      title={alertProps.title}
-      message={alertProps.message}
-    />
-  </SafeAreaView>
-);
+      <TouchableOpacity
+        style={[
+          styles.updateBtn,
+          { borderColor: "red", backgroundColor: theme.pageBg },
+        ]}
+        onPress={handleRemovePin}
+      >
+        <Text style={[styles.updateText, { color: "red" }]}>
+          Remove PIN & Biometrics
+        </Text>
+      </TouchableOpacity>
+    </>
+  ) : (
+    <TouchableOpacity
+      style={[styles.updateBtn, { borderColor: theme.buttonBg }]}
+      onPress={() => router.push("/set-pin")}
+    >
+      <Text style={[styles.updateText, { color: theme.buttonBg }]}>
+        Set PIN
+      </Text>
+    </TouchableOpacity>
+  )}
+</View>
 
+      </ScrollView>
 
+      <CustomAlert
+        visible={alertVisible}
+        onClose={() => setAlertVisible(false)}
+        type={alertProps.type}
+        title={alertProps.title}
+        message={alertProps.message}
+      />
+    </SafeAreaView>
+  );
 
 }
 
+
+
 const alertStyles = StyleSheet.create({
-  
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.3)',
@@ -311,120 +399,137 @@ const alertStyles = StyleSheet.create({
     borderRadius: 10,
     padding: 20,
     alignItems: 'center',
+    backgroundColor: '#f5f5f5', // light neutral background
   },
-  icon: { fontSize: 40, marginBottom: 10 },
-  title: { fontWeight: '700', fontSize: 18, marginBottom: 8 },
-  message: { fontSize: 15, color: '#555', textAlign: 'center', marginBottom: 15 },
+  icon: {
+    fontSize: 40,
+    marginBottom: 10,
+    color: '#000', // black icon
+  },
+  title: {
+    fontWeight: '700',
+    fontSize: 18,
+    marginBottom: 8,
+    color: '#000', // black title
+  },
+  message: {
+    fontSize: 15,
+    color: '#333', // darker gray for better readability
+    textAlign: 'center',
+    marginBottom: 15,
+  },
   button: {
-    backgroundColor: '#4ADE80',
+    backgroundColor: '#000', // black button
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 25,
     minWidth: 100,
   },
-  buttonText: { color: '#fff', fontWeight: '700', textAlign: 'center' },
+  buttonText: {
+    color: '#fff',
+    fontWeight: '700',
+    textAlign: 'center',
+  },
 });
 
 
 
 const styles = StyleSheet.create({
-   page: {
-  flex: 1,
-  backgroundColor: '#fff',
-},
+  page: {
+    flex: 1,
+    
+  },
 
-scrollContent: {
-  padding: 20,
-  paddingBottom: 40,
-},
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
 
   container: {
     padding: 15,
     paddingBottom: 50,
   },
+
   imageSection: {
     alignItems: 'center',
     marginBottom: 20,
   },
+
   profileImage: {
     width: 120,
     height: 120,
     borderRadius: 60,
     borderWidth: 2,
-    borderColor: '#4ADE80',
+    
   },
+
   imageText: {
     marginTop: 8,
-    color: '#4ADE80',
     fontWeight: '600',
   },
+
   section: {
     marginVertical: 15,
     padding: 15,
-    backgroundColor: '#f3f4f6',
     borderRadius: 10,
   },
+
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#16a34a',
     marginBottom: 10,
   },
+
   input: {
-    backgroundColor: 'white',
     padding: 10,
     marginVertical: 8,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#4ade80',
   },
+
   saveBtn: {
-    backgroundColor: '#16a34a',
     paddingVertical: 12,
     borderRadius: 6,
     marginTop: 10,
   },
+
   saveText: {
-    color: 'white',
     fontWeight: '700',
     textAlign: 'center',
   },
+
   updateBtn: {
-    marginTop: 10,
-    backgroundColor: '#22c55e',
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  updateText: {
-    color: 'white',
-    fontWeight: '700',
-    textAlign: 'center',
-  },
+  marginTop: 10,
+  paddingVertical: 10,
+  borderRadius: 6,
+  borderWidth: 1,
+  alignItems: "center",
+},
+updateText: {
+  fontWeight: "700",
+  textAlign: "center",
+},
+
+
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-logoutWrapper: {
-  padding: 16,
-  borderTopWidth: 1,
-  borderColor: '#e5e7eb',
-  backgroundColor: '#fff',
-},
+  logoutWrapper: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderColor: '#ccc',
+    backgroundColor: '#f9f9f9',
+  },
 
-logoutBtn: {
-  backgroundColor: '#ef4444',
-  paddingVertical: 12,
-  borderRadius: 6,
-  alignSelf: 'center',
-  width: '100%',
-},
-
-logoutText: {
-  color: '#fff',
-  fontWeight: '700',
-  textAlign: 'center',
-},
+  logoutBtn: {
+    backgroundColor: '#ef4444',
+    paddingVertical: 12,
+    borderRadius: 6,
+    alignSelf: 'center',
+    width: '100%',
+  },
 
 });

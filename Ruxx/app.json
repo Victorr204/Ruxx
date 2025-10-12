@@ -1,24 +1,33 @@
 {
   "expo": {
-    "name": "Ruxx",
+    "name": "Ruxx pay",
     "slug": "Ruxx",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "",
+    "icon": "./assets/images/logo.png",
+    "resizeMode": "fit",
     "scheme": "ruxx",
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.victor.Ruxx"
+      "bundleIdentifier": "com.ruxxdigital.ruxxpay"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "",
-        "backgroundColor": "#ffffff",
-        "package": "com.victor.Ruxx"
+        "foregroundImage": "./assets/images/logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#fff",
+        "package": "com.ruxxdigital.ruxxpay",
+        "edgeToEdgeEnabled": true
+
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.ruxxdigital.ruxxpay"
     },
     "web": {
       "bundler": "metro",
@@ -30,18 +39,32 @@
       [
         "expo-splash-screen",
         {
-          "image": "",
+          "image": "./assets/images/logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#fff"
         }
       ],
+        [
+        "react-native-edge-to-edge",
+        {
+          "android": {
+            "parentTheme": "Material3.Dynamic"
+          }
+        }
+      ],
+
       "expo-secure-store",
       "expo-font",
       "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "379f9f73-c093-4384-996e-d0d8aa518636"
+      }
     }
   }
 }

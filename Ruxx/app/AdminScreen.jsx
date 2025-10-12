@@ -9,20 +9,30 @@ import {
   Modal,
   TouchableOpacity,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
+ import { Picker } from '@react-native-picker/picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { account, databases, Config } from '../appwriteConfig';
 
 const AdminScreen = () => {
   const [kycList, setKycList] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [users, setUsers] = useState([]); // 👈 all users list
   const [modalVisible, setModalVisible] = useState(false);
   const [modalImage, setModalImage] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState('kyc'); // 'kyc' or 'transactions'
+  const [selectedTab, setSelectedTab] = useState('kyc'); // kyc | transactions | notifications
 
-  useEffect(() => {
+
+   // notification state
+  const [message, setMessage] = useState('');
+  const [recipient, setRecipient] = useState('all'); // "all" or userId
+  const [title, setTitle] = useState("");
+
+
+ useEffect(() => {
     const checkRoleAndFetch = async () => {
       try {
         const sessionUser = await account.get();
@@ -35,22 +45,21 @@ const AdminScreen = () => {
         if (userDoc.role === 'admin') {
           setIsAdmin(true);
 
-          const kycRes = await databases.listDocuments(
-            Config.databaseId,
-            Config.kycCollectionId
-          );
-          const txnRes = await databases.listDocuments(
-            Config.databaseId,
-            Config.txnCollectionId
-          );
+          // fetch KYC + TXN
+          const [kycRes, txnRes, usersRes] = await Promise.all([
+            databases.listDocuments(Config.databaseId, Config.kycCollectionId),
+            databases.listDocuments(Config.databaseId, Config.txnCollectionId),
+            databases.listDocuments(Config.databaseId, Config.userCollectionId),
+          ]);
 
           setKycList(kycRes.documents);
           setTransactions(txnRes.documents);
+          setUsers(usersRes.documents);
         } else {
           setIsAdmin(false);
         }
-      } catch (error) {
-        console.error('Admin check error:', error.message);
+      } catch (_error) {
+          console.error('Admin check error:', _error.message);
       } finally {
         setLoading(false);
       }
@@ -58,6 +67,34 @@ const AdminScreen = () => {
 
     checkRoleAndFetch();
   }, []);
+
+  // 📢 send notification
+const sendNotification = async () => {
+  if (!title.trim()) return alert("Title is required!");
+  if (!message.trim()) return alert("Message is required!");
+
+  try {
+    await databases.createDocument(
+      Config.databaseId,
+      Config.adminNotificationsCollectionId,
+      "unique()",
+      {
+        title,
+        message,
+        recipient: recipient === "all" ? "all" : recipient,
+       
+      }
+    );
+
+    alert("Notification sent successfully!");
+    setTitle("");
+    setMessage("");
+    setRecipient("all");
+  } catch (err) {
+    console.error("Send notification error:", err);
+    alert("Failed to send notification");
+  }
+};
 
   const updateKycStatus = async (docId, newStatus, userId) => {
     await databases.updateDocument(
@@ -96,7 +133,7 @@ const AdminScreen = () => {
     let parsed = {};
     try {
       parsed = typeof item.idDetails === 'string' ? JSON.parse(item.idDetails) : item.idDetails;
-    } catch (e) {
+    } catch (_e) {
       console.warn('Invalid ID details format');
     }
     return parsed || {};
@@ -151,7 +188,7 @@ const AdminScreen = () => {
     </View>
   );
 
-  if (loading) {
+ if (loading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" />
@@ -184,51 +221,101 @@ const AdminScreen = () => {
 
           <TouchableOpacity
             onPress={() => setSelectedTab('transactions')}
-            style={[styles.tabButton, selectedTab === 'transactions' && styles.activeTab]}
+            style={[
+              styles.tabButton,
+              selectedTab === 'transactions' && styles.activeTab,
+            ]}
           >
-            <Text style={[styles.tabText, selectedTab === 'transactions' && styles.activeTabText]}>
+            <Text
+              style={[styles.tabText, selectedTab === 'transactions' && styles.activeTabText]}
+            >
               Transactions
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => setSelectedTab('notifications')}
+            style={[
+              styles.tabButton,
+              selectedTab === 'notifications' && styles.activeTab,
+            ]}
+          >
+            <Text
+              style={[styles.tabText, selectedTab === 'notifications' && styles.activeTabText]}
+            >
+              Notifications
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Section Content */}
         {selectedTab === 'kyc' ? (
-          <>
-            {kycList.length > 0 ? (
-              kycList.map(renderKYC)
-            ) : (
-              <Text>No KYC submissions found.</Text>
-            )}
-          </>
+          kycList.length > 0 ? kycList.map(renderKYC) : <Text>No KYC found.</Text>
+        ) : selectedTab === 'transactions' ? (
+          transactions.length > 0 ? transactions.map(renderTransaction) : <Text>No transactions found.</Text>
         ) : (
-          <>
-            {transactions.length > 0 ? (
-              transactions.map(renderTransaction)
-            ) : (
-              <Text>No transactions found.</Text>
-            )}
-          </>
+          // 🔔 Notifications UI
+          <View style={styles.card}>
+  <Text style={styles.title}>Send Notification</Text>
+
+  <TextInput
+    value={title}
+    onChangeText={setTitle}
+    placeholder="Enter title..."
+    style={styles.input}
+  />
+
+  <TextInput
+    value={message}
+    onChangeText={setMessage}
+    placeholder="Enter your message..."
+    style={[styles.input, { marginTop: 10, height: 80 }]}
+    multiline
+  />
+
+  <Text style={{ marginTop: 10 }}>Recipient:</Text>
+  <Picker
+    selectedValue={recipient}
+    onValueChange={(value) => setRecipient(value)}
+  >
+    <Picker.Item label="All Users" value="all" />
+    {users.map((u) => (
+      <Picker.Item
+        key={u.$id}
+        label={`${u.name || u.email} (${u.$id})`}
+        value={u.$id}
+      />
+    ))}
+  </Picker>
+
+  <Button title="Send" onPress={sendNotification} color="green" />
+</View>
+
         )}
       </ScrollView>
-
-      {/* Image Modal */}
-      <Modal visible={modalVisible} transparent={true} animationType="fade">
-        <View style={styles.modalBackground}>
-          <TouchableOpacity style={styles.modalCloseArea} onPress={() => setModalVisible(false)} />
-          <View style={styles.modalContent}>
-            <Image
-              source={{ uri: modalImage }}
-              style={styles.modalImage}
-              resizeMode="contain"
-            />
-            <Button title="Close" onPress={() => setModalVisible(false)} />
+      {/* Image preview modal (keeps Modal/modalImage/modalVisible used) */}
+      {modalVisible && (
+        <Modal transparent animationType="fade" visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
+          <View style={styles.modalBackground}>
+            <View style={styles.modalContent}>
+              {modalImage ? (
+                <Image source={{ uri: modalImage }} style={styles.modalImage} />
+              ) : (
+                <Text>No image</Text>
+              )}
+              <TouchableOpacity style={{ marginTop: 8 }} onPress={() => setModalVisible(false)}>
+                <Text>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };
+
+
+ 
 
 const styles = StyleSheet.create({
   container: { padding: 16 },
@@ -243,6 +330,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 6,
+    padding: 8,
+    backgroundColor: '#fff',
+  },
+
   modalCloseArea: {
     position: 'absolute',
     width: '100%',
@@ -266,30 +361,13 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   // Tabs
-  tabRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 16,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 8,
-    padding: 4,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  activeTab: {
-    backgroundColor: '#16a34a',
-  },
-  tabText: {
-    color: '#374151',
-    fontWeight: '600',
-  },
-  activeTabText: {
-    color: '#fff',
-  },
+  // tabs
+  tabRow: { flexDirection: 'row', marginBottom: 16, backgroundColor: '#e5e7eb', borderRadius: 8 },
+  tabButton: { flex: 1, paddingVertical: 10, borderRadius: 6, alignItems: 'center' },
+  activeTab: { backgroundColor: '#16a34a' },
+  tabText: { color: '#374151', fontWeight: '600' },
+  activeTabText: { color: '#fff' },
+  // ...tabButton defined above
 });
 
 export default AdminScreen;
