@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -74,35 +74,37 @@ export default function Profile() {
     setAlertVisible(true);
   };
 
-  const loadUserData = async () => {
-    try {
-      const user = await account.get();
-      const res = await databases.listDocuments(Config.databaseId, Config.userCollectionId, [
-        Query.equal('userId', user.$id),
-      ]);
+ const loadUserData = useCallback(async () => {
+  try {
+    const user = await account.get();
+    const res = await databases.listDocuments(Config.databaseId, Config.userCollectionId, [
+      Query.equal('userId', user.$id),
+    ]);
 
-      if (res.documents.length === 0) {
-        throw new Error('User document not found.');
-      }
-
-      const data = res.documents[0];
-      setUserData(data);
-      setForm({
-        name: data.name || '',
-        age: data.age || '',
-        phone: data.phone || '',
-      });
-    } catch (_err) {
-      console.log(_err);
-      showAlert({
-        type: 'error',
-        title: 'Error',
-        message: _err.message || 'Failed to load user data.',
-      });
-    } finally {
-      setLoading(false);
+    if (res.documents.length === 0) {
+      throw new Error('User document not found.');
     }
-  }; 
+
+    const data = res.documents[0];
+    setUserData(data);
+    setForm({
+      name: data.name || '',
+      age: data.age || '',
+      phone: data.phone || '',
+    });
+  } catch (_err) {
+    console.log(_err);
+    showAlert({
+      type: 'error',
+      title: 'Error',
+      message: _err.message || 'Failed to load user data.',
+    });
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
+
 
   const updateSection = async () => {
     try {
@@ -130,74 +132,81 @@ export default function Profile() {
   };
 
   const pickAndUploadImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      showAlert({
-        type: 'warning',
-        title: 'Permission Denied',
-        message: 'Please allow photo access to continue.',
-      });
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
+  // Request permission
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  const granted = permission?.granted ?? permission?.status === 'granted';
+  if (!granted) {
+    showAlert({
+      type: 'warning',
+      title: 'Permission Denied',
+      message: 'Please allow photo access to continue.',
     });
+    return;
+  }
 
-    if (!result.canceled) {
-      try {
-        const localUri = result.assets[0].uri;
-        const formData = new FormData();
-        formData.append('file', {
-          uri: localUri,
-          type: 'image/jpeg',
-          name: 'upload.jpg',
-        });
-        formData.append('upload_preset', UPLOAD_PRESET);
+  // ✅ Use new Expo API for mediaTypes
+  const result = await ImagePicker.launchImageLibraryAsync({
+  mediaTypes: ImagePicker.MediaTypeOptions
+    ? ImagePicker.MediaTypeOptions.Images
+    : [ImagePicker.MediaType.Image],
+  allowsEditing: true,
+  quality: 0.7,
+});
 
-        const response = await fetch(
-          `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`,
-          {
-            method: 'POST',
-            body: formData,
-          }
-        );
 
-        const data = await response.json();
-        if (data.secure_url) {
-          const user = await account.get();
-          const res = await databases.listDocuments(Config.databaseId, Config.userCollectionId, [
-            Query.equal('userId', user.$id),
-          ]);
+  if (!result.canceled) {
+    try {
+      const localUri = result.assets[0].uri;
+      const formData = new FormData();
+      formData.append('file', {
+        uri: localUri,
+        type: 'image/jpeg',
+        name: 'upload.jpg',
+      });
+      formData.append('upload_preset', UPLOAD_PRESET);
 
-          if (res.documents.length === 0) return;
-          const docId = res.documents[0].$id;
-
-          await databases.updateDocument(Config.databaseId, Config.userCollectionId, docId, {
-            profilePic: data.secure_url,
-          });
-
-          showAlert({
-            type: 'success',
-            title: 'Success',
-            message: 'Profile picture updated!',
-          });
-          loadUserData();
-        } else {
-          throw new Error('Image upload failed');
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`,
+        {
+          method: 'POST',
+          body: formData,
         }
-      } catch (error) {
-        console.error(error);
-        showAlert({
-          type: 'error',
-          title: 'Upload Failed',
-          message: 'Failed to upload image. Try again.',
+      );
+
+      const data = await response.json();
+      if (data.secure_url) {
+        const user = await account.get();
+        const res = await databases.listDocuments(Config.databaseId, Config.userCollectionId, [
+          Query.equal('userId', user.$id),
+        ]);
+
+        if (res.documents.length === 0) return;
+        const docId = res.documents[0].$id;
+
+        await databases.updateDocument(Config.databaseId, Config.userCollectionId, docId, {
+          profilePic: data.secure_url,
         });
+
+        showAlert({
+          type: 'success',
+          title: 'Success',
+          message: 'Profile picture updated!',
+        });
+        loadUserData();
+      } else {
+        throw new Error('Image upload failed');
       }
+    } catch (error) {
+      console.error(error);
+      showAlert({
+        type: 'error',
+        title: 'Upload Failed',
+        message: 'Failed to upload image. Try again.',
+      });
     }
-  };
+  }
+};
+
 
   
 
@@ -231,11 +240,10 @@ export default function Profile() {
 
 
   // loadUserData is stable; run once on mount
-   
-   
   useEffect(() => {
-    loadUserData();
-  }, []);
+  loadUserData();
+}, [loadUserData]);
+
 
   if (loading) {
     return (
@@ -309,7 +317,7 @@ export default function Profile() {
                 ]}
               />
               <TouchableOpacity
-                style={[styles.saveBtn, { backgroundColor: theme.buttonBg }]}
+                style={[styles.saveBtn, { backgroundColor: theme.cardBackground, borderColor: theme.text }]}
                 onPress={updateSection}
               >
                 <Text style={[styles.saveText, { color: theme.text }]}>Save Info</Text>
@@ -490,6 +498,7 @@ const styles = StyleSheet.create({
   saveBtn: {
     paddingVertical: 12,
     borderRadius: 6,
+    borderWidth: 1,
     marginTop: 10,
   },
 

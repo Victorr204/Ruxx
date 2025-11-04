@@ -8,10 +8,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { databases, account, Query, Config } from '../appwriteConfig';
+import { useTheme } from '../context/ThemeContext';
 
 export default function TransactionHistory() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { theme } = useTheme();
 
   const fetchUserTransactions = async () => {
     try {
@@ -40,46 +42,46 @@ export default function TransactionHistory() {
 
   if (loading)
     return (
-      <SafeAreaView style={{ flex: 1 }}>
-        <ActivityIndicator size="large" style={{ marginTop: 50 }} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
+        <ActivityIndicator size="large" style={{ marginTop: 50 }} color={theme.primary} />
       </SafeAreaView>
     );
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Transaction History</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
+      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.pageBg }]}> 
+        <Text style={[styles.title, { color: theme.text }]}>Transaction History</Text>
         {transactions.length === 0 ? (
-          <Text style={styles.empty}>No transactions found.</Text>
+          <Text style={[styles.empty, { color: theme.subtitle }]}>No transactions found.</Text>
         ) : (
           transactions.map((txn) => (
-            <View key={txn.$id} style={styles.item}>
-              <Text style={styles.label}>
-                Service: <Text style={styles.value}>{txn.serviceType}</Text>
+            <View key={txn.$id} style={[styles.item, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+              <Text style={[styles.label, { color: theme.label }]}> 
+                Service: <Text style={[styles.value, { color: theme.text }]}>{txn.serviceType}</Text>
               </Text>
-              <Text style={styles.label}>
-                To: <Text style={styles.value}>{txn.recipient}</Text>
+              <Text style={[styles.label, { color: theme.label }]}> 
+                To: <Text style={[styles.value, { color: theme.text }]}>{txn.recipient}</Text>
               </Text>
-              <Text style={styles.label}>
-                Provider: <Text style={styles.value}>{txn.provider}</Text>
+              <Text style={[styles.label, { color: theme.label }]}> 
+                Provider: <Text style={[styles.value, { color: theme.text }]}>{txn.provider}</Text>
               </Text>
-              <Text style={styles.label}>
-                Amount: ₦<Text style={styles.value}>{txn.amount}</Text>
+              <Text style={[styles.label, { color: theme.label }]}> 
+                Amount: ₦<Text style={[styles.value, { color: theme.text }]}>{txn.amount}</Text>
               </Text>
-              <Text style={styles.label}>
+              <Text style={[styles.label, {color: theme.label}]}>
                 Status:{' '}
                 <Text
                   style={[
                     styles.value,
-                    { color: txn.status === 'Success' ? 'green' : 'red' },
+                    { color: txn.status === 'Success' ? theme.primary : theme.danger },
                   ]}
                 >
                   {txn.status}
                 </Text>
               </Text>
-              <Text style={styles.timestamp}>
+              <Text style={[styles.timestamp, { color: theme.subtitle }]}> 
                 Date: {new Date(txn.$createdAt).toLocaleDateString()}{' '}
-                {new Date(txn.$createdAt).toLocaleTimeString()}
+                {new Date(txn.$createdAt).toLocaleTimeString()} 
               </Text>
             </View>
           ))
@@ -94,35 +96,34 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   title: {
-    fontSize: 22,
+    fontSize: 22, 
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
-    color: '#000', // black title text
+    
   },
   item: {
     marginBottom: 16,
-    backgroundColor: '#f5f5f5', // light neutral background
     padding: 14,
     borderRadius: 10,
   },
   label: {
     fontWeight: '600',
-    color: '#000', // black label text
+    
   },
   value: {
     fontWeight: 'normal',
-    color: '#333', // dark gray value text
+    
   },
   timestamp: {
     marginTop: 6,
     fontSize: 12,
-    color: '#555', // medium gray timestamp
+   
   },
   empty: {
     textAlign: 'center',
     marginTop: 40,
     fontSize: 16,
-    color: '#666', // soft gray for empty state
+    
   },
 });

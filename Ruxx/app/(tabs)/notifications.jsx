@@ -98,7 +98,7 @@ export default function NotificationScreen() {
               <Text style={[styles.cardTitle, { color: theme.text }]}>
                 {item.title || "Notification"}
               </Text>
-              <Text style={[styles.cardMessage, { color: theme.text }]}>
+              <Text style={[styles.cardMessage, { color: theme.text, }]}>
                 {item.message}
               </Text>
               <Text style={[styles.timestamp, { color: theme.subtitle }]}>

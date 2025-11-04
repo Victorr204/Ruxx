@@ -324,7 +324,7 @@ export default function TVPage() {
                   {
                     backgroundColor:
                       provider === item.id
-                        ? theme.buttonBackground
+                        ? theme.selectedBackground
                         : theme.cardBackground,
                   },
                 ]}

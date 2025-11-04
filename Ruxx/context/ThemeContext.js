@@ -5,14 +5,12 @@ import { Appearance } from "react-native";
 
 const ThemeContext = createContext();
 
-
-
  
 
 const lightTheme = {
   background: "#f5f5f5",
   text: "#000000",
-  card: "#f5f5f5",
+  card: "#dcdcdc",
   border: "#000000",
   inputBackground: "#ffffff",
   inputText: "#000000",

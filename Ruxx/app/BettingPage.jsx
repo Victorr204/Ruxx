@@ -173,7 +173,7 @@ export default function BettingPage() {
                 styles.bettingProviderButton,
                 {
                   backgroundColor:
-                    provider?.id === prov.id ? theme.primary : theme.card,
+                    provider?.id === prov.id ? theme.selectedBackground : theme.card,
                   borderColor:
                     provider?.id === prov.id ? theme.primary : theme.border,
                 },
